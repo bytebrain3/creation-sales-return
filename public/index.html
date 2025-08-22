@@ -289,6 +289,7 @@ pochondo hoy nai</textarea
         statusElement.textContent = "Connected";
         statusElement.className = "status-connected";
         connectionIndicator.className = "connection-indicator connected";
+        logsContainer.innerHTML = ""; // Clear logs on reconnect
         addLogEntry("Connected to server", "info");
       });
 
@@ -296,6 +297,7 @@ pochondo hoy nai</textarea
         statusElement.textContent = "Disconnected";
         statusElement.className = "status-disconnected";
         connectionIndicator.className = "connection-indicator disconnected";
+        logsContainer.innerHTML = ""; // Clear logs on disconnect
         addLogEntry("Disconnected from server", "warning");
       });
 
