@@ -1,14 +1,29 @@
-const express = require("express");
-const path = require("path");
-const puppeteer = require("puppeteer");
-const os = require("os");
-const fs = require("fs");
-const cred = require("./credentials.json");
+import express from "express";
+import path from "path";
+import puppeteer from "puppeteer";
+import os from "os";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+
+import { Server } from "socket.io";
+import http from "http";
+
 const app = express();
+// init the socket server
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
 const PORT = 5000;
 
 // Middleware
 app.use(express.json());
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // Add CORS headers to allow requests from any origin
@@ -32,14 +47,19 @@ const TIMEOUT = {
   action: 3000,
 };
 
+function logAndEmit(message, type = "info") {
+  console.log(message);
+  io.emit("log", { message, type, timestamp: new Date().toISOString() });
+}
+
 // Utility function to save results to files
 function saveResults(successful, failed) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const resultsDir = path.join(__dirname, "results");
 
   // Create results directory if it doesn't exist
-  if (!fs.existsSync(resultsDir)) {
-    fs.mkdirSync(resultsDir, { recursive: true });
+  if (!existsSync(resultsDir)) {
+    mkdirSync(resultsDir, { recursive: true });
   }
 
   const successPath = path.join(
@@ -48,9 +68,9 @@ function saveResults(successful, failed) {
   );
   const failedPath = path.join(resultsDir, `failed-invoices-${timestamp}.json`);
 
-  fs.writeFileSync(successPath, JSON.stringify(successful, null, 2));
+  writeFileSync(successPath, JSON.stringify(successful, null, 2));
   if (failed.length > 0) {
-    fs.writeFileSync(failedPath, JSON.stringify(failed, null, 2));
+    writeFileSync(failedPath, JSON.stringify(failed, null, 2));
   }
 
   console.log("\nResults saved to:");
@@ -83,7 +103,7 @@ async function safeWaitForSelector(page, selector, timeout = TIMEOUT.element) {
 // Function to process a single invoice
 async function processInvoice(page, id, reason) {
   try {
-    console.log(`🔄 [${id}] Processing invoice`);
+    logAndEmit(`🔄 [${id}] Processing invoice`);
 
     // Force an error for testing if the ID contains "test"
     if (id.toLowerCase().includes("test")) {
@@ -123,7 +143,7 @@ async function processInvoice(page, id, reason) {
       .catch(() => {
         throw new Error("Customer name not found");
       });
-    console.log(`🔍 [${id}] Expected name: ${expectedName}`);
+    logAndEmit(`🔍 [${id}] Expected name: ${expectedName}`);
 
     // Check if the dropdown toggle exists
     const hasDropdown = await page.evaluate(() => {
@@ -168,7 +188,7 @@ async function processInvoice(page, id, reason) {
       }),
       page.click('.dropdown-menu a[href*="/return-sale/invoice"]'),
     ]);
-    console.log(`🚚 [${id}] Opened return form`);
+    logAndEmit(`🚚 [${id}] Opened return form`);
 
     // 5️⃣ Fill and submit return form
     await safeWaitForSelector(page, 'textarea[name="return_note"]');
@@ -185,7 +205,7 @@ async function processInvoice(page, id, reason) {
     const submitButtonSelector =
       'form.payment-form button[type="submit"].btn.btn-primary';
     await safeWaitForSelector(page, submitButtonSelector, TIMEOUT.element);
-    console.log(`🔘 [${id}] Found submit button`);
+    logAndEmit(`🔘 [${id}] Found submit button`);
 
     let submitButton = await page.$(submitButtonSelector);
     if (!submitButton) {
@@ -200,11 +220,9 @@ async function processInvoice(page, id, reason) {
     try {
       await submitButton.click({ delay: 100 });
     } catch (clickError) {
-      console.log(
-        `⚠️ [${id}] Direct click failed, trying alternate methods...`
-      );
+      logAndEmit(`⚠️ [${id}] Direct click failed, trying alternate methods...`);
       try {
-        await page.evaluate((s0033415elector) => {
+        await page.evaluate((selector) => {
           const btn = document.querySelector(selector);
           if (btn) btn.click();
         }, submitButtonSelector);
@@ -218,7 +236,7 @@ async function processInvoice(page, id, reason) {
       waitUntil: "networkidle2",
       timeout: TIMEOUT.navigation,
     });
-    console.log(`✅ [${id}] Submitted return form`);
+    logAndEmit(`✅ [${id}] Submitted return form`);
 
     // Check for redirection
     const currentUrl = page.url();
@@ -264,6 +282,7 @@ async function processInvoice(page, id, reason) {
 // Main function to process invoices
 async function processInvoices(invoices) {
   let browser;
+  let page; // Declare the page variable here
   const successfulInvoices = [];
   const failedInvoices = [];
 
@@ -287,7 +306,7 @@ async function processInvoices(invoices) {
       }
 
       // Check if the Chrome executable exists
-      if (!fs.existsSync(executablePath)) {
+      if (!existsSync(executablePath)) {
         throw new Error(`Chrome executable not found at ${executablePath}`);
       }
     } catch (pathError) {
@@ -307,7 +326,6 @@ async function processInvoices(invoices) {
       browser = await puppeteer.launch({
         executablePath,
         headless: false,
-
         defaultViewport: null,
         protocolTimeout: 1800000, // 3 minutes protocol timeout
         args: [
@@ -320,7 +338,7 @@ async function processInvoices(invoices) {
         ],
       });
 
-      page = await browser.newPage();
+      page = await browser.newPage(); // Initialize the page here
       await page.setDefaultNavigationTimeout(TIMEOUT.navigation);
       await page.setDefaultTimeout(TIMEOUT.element);
     } catch (browserError) {
@@ -340,11 +358,11 @@ async function processInvoices(invoices) {
     try {
       await safeNavigate(page, "https://creationedgebd.com/login");
       await safeWaitForSelector(page, "#login-username");
-      await page.type("#login-username", cred.username);
-      await page.type("#login-password", cred.password);
+      await page.type("#login-username", "Raisul@gmail.com");
+      await page.type("#login-password", "thisisatestpassword");
       await page.click('button[type="submit"]');
       await page.waitForNavigation({ waitUntil: "networkidle2" });
-      console.log("✅ Logged in");
+      logAndEmit("✅ Logged in");
     } catch (loginError) {
       // If login fails, all invoices will fail
       console.error("❌ Login failed:", loginError.message);
@@ -435,10 +453,17 @@ async function processInvoices(invoices) {
     console.log(`Successful: ${successfulInvoices.length}`);
     console.log(`Failed: ${failedInvoices.length}`);
 
+    const finalLog = {
+      total: invoices.length,
+      successful: successfulInvoices.length,
+      failed: failedInvoices.length,
+    };
+    logAndEmit("Final Summary:", finalLog);
+
     // Save results to files
     //saveResults(successfulInvoices, failedInvoices)
 
-    console.log("Failed invoices:", failedInvoices);
+    logAndEmit("Failed invoices:", failedInvoices);
     return { successfulInvoices, failedInvoices };
   } catch (err) {
     console.error("Fatal error:", err.message);
@@ -485,10 +510,10 @@ app.post("/api/process-invoices", async (req, res) => {
         .json({ message: "No invoices provided or invalid format" });
     }
 
-    console.log(`Received request to process ${invoices.length} invoices`);
+    logAndEmit(`Received request to process ${invoices.length} invoices`);
 
     const results = await processInvoices(invoices);
-    console.log("Sending results to client:", results);
+    logAndEmit("Sending results to client:", results);
     res.json(results);
   } catch (error) {
     console.error("Error processing invoices:", error);
@@ -539,8 +564,20 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
+
+  socket.emit("welcome", {
+    message: "Welcome to the Invoice Return Automation System!",
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
+});
+
 // Start the server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
 });
