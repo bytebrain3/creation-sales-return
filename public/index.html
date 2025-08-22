@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Return Automation - Laser Scanner</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Invoice Return Automation</h1>
+    
+    <div class="server-status">
+      <span id="server-status-indicator" class="status-indicator offline"></span>
+      <span id="server-status-text">Checking server status...</span>
+    </div>
+    
+    <div class="grid">
+      <!-- Barcode Scanner Section -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Scan Invoice Barcode</h2>
+          <p>Use your laser scanner to scan invoice barcodes</p>
+        </div>
+        <div class="card-content">
+          <div class="scanner-container">
+            <div class="scanner-input-area">
+              <div class="scanner-status-display">
+                <div id="scanner-indicator" class="scanner-indicator ready"></div>
+                <span id="scanner-status">Ready for scanning</span>
+              </div>
+              
+              <!-- Hidden input field that captures scanner data -->
+              <input 
+                type="text" 
+                id="barcode-input" 
+                class="barcode-input" 
+                placeholder="Focus here and scan barcode with laser scanner"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              
+              <div class="last-scanned">
+                <strong>Last Scanned:</strong> <span id="last-scanned-code">None</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Manual entry fallback -->
+          <div class="manual-entry">
+            <h3>Manual Entry (Fallback)</h3>
+            <div class="form-group">
+              <label for="manual-invoice-id">Invoice ID</label>
+              <input
+                type="text"
+                id="manual-invoice-id"
+                placeholder="Enter Invoice ID manually if needed"
+                class="manual-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="reason">Return Reason</label>
+              <textarea id="reason" placeholder="Enter return reason">pochondo hoy nai</textarea>
+            </div>
+            <button id="manual-add-btn" class="btn btn-secondary">
+              <span class="icon">✏️</span> Add Manually
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice List -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Scanned Invoices</h2>
+          <p id="invoice-count">No invoices scanned yet</p>
+        </div>
+        <div class="card-content">
+          <div id="invoice-table-container">
+            <table id="invoice-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Reason</th>
+                  <th>Scan Time</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="invoice-list">
+                <!-- Invoices will be added here -->
+              </tbody>
+            </table>
+            <div id="no-invoices-message" class="text-center">
+              Scan invoice barcodes to add them to the list
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="button-group">
+            <button id="process-btn" class="btn btn-success" disabled>
+              <span class="icon">▶</span> Process Invoices
+            </button>
+            <button id="test-errors-btn" class="btn btn-warning">
+              <span class="icon">⚠️</span> Test Error Handling
+            </button>
+            <button id="clear-all-btn" class="btn btn-danger">
+              <span class="icon">🗑️</span> Clear All
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Alert -->
+    <div id="error-alert" class="alert alert-error" style="display: none;">
+      <h3>Error</h3>
+      <p id="error-message"></p>
+      <button id="close-error-btn" class="btn btn-sm">Close</button>
+    </div>
+
+    <!-- Success Alert -->
+    <div id="success-alert" class="alert alert-success" style="display: none;">
+      <h3>Success</h3>
+      <p id="success-message"></p>
+      <button id="close-success-btn" class="btn btn-sm">Close</button>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" style="display: none;">
+      <div class="results-header">
+        <h2>Processing Results</h2>
+        <div class="download-buttons">
+          <button id="download-results-btn" class="btn btn-primary">
+            <span class="icon">⬇️</span> Download Results
+          </button>
+        </div>
+      </div>
+      <div class="grid">
+        <!-- Successful Invoices -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="text-success">Successful (<span id="successful-count">0</span>)</h2>
+          </div>
+          <div class="card-content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Reason</th>
+                  <th>Customer</th>
+                </tr>
+              </thead>
+              <tbody id="successful-list">
+                <!-- Successful invoices will be added here -->
+              </tbody>
+            </table>
+            <div id="no-successful-message" class="text-center">
+              No successful invoices
+            </div>
+          </div>
+        </div>
+        <!-- Failed Invoices -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="text-error">Failed (<span id="failed-count">0</span>)</h2>
+          </div>
+          <div class="card-content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Reason</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody id="failed-list">
+                <!-- Failed invoices will be added here -->
+              </tbody>
+            </table>
+            <div id="no-failed-message" class="text-center">
+              No failed invoices
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" style="display: none;">
+      <div class="spinner"></div>
+      <p>Processing invoices...</p>
+    </div>
+  </div>
+
+  <script>
+    // Check server status immediately when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      const statusIndicator = document.getElementById('server-status-indicator');
+      const statusText = document.getElementById('server-status-text');
+      
+      // Function to check server status
+      function checkServerStatus() {
+        fetch('/api/health')
+          .then(response => {
+            if (response.ok) {
+              statusIndicator.className = 'status-indicator online';
+              statusText.textContent = 'Server is online';
+              return response.json();
+            } else {
+              throw new Error('Server is not responding properly');
+            }
+          })
+          .then(data => {
+            console.log('Server health check:', data);
+          })
+          .catch(error => {
+            console.error('Server health check failed:', error);
+            statusIndicator.className = 'status-indicator offline';
+            statusText.textContent = 'Server is offline - errors will be simulated';
+          });
+      }
+      
+      // Check status immediately and then every 30 seconds
+      checkServerStatus();
+      setInterval(checkServerStatus, 30000);
+      
+      // Add event listener for the close error button
+      document.getElementById('close-error-btn').addEventListener('click', function() {
+        document.getElementById('error-alert').style.display = 'none';
+      });
+
+      // Add event listener for the close success button
+      document.getElementById('close-success-btn').addEventListener('click', function() {
+        document.getElementById('success-alert').style.display = 'none';
+      });
+    });
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

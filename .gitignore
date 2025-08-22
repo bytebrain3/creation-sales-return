@@ -1,0 +1,4 @@
+# .gitignore
+browser-data/
+
+node_modules/
