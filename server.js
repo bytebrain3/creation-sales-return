@@ -291,7 +291,7 @@ async function processInvoices(invoices) {
 
     try {
       browser = await puppeteer.launch({
-        headless: false,
+        headless: true,
         defaultViewport: null,
         protocolTimeout: 1800000, // 3 minutes protocol timeout
         args: [
