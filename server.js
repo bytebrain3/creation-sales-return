@@ -288,43 +288,9 @@ async function processInvoices(invoices) {
 
   try {
     // Detect the platform
-    const platform = os.platform();
-    let executablePath;
-
-    try {
-      executablePath =
-        platform === "win32"
-          ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-          : platform === "linux"
-          ? "/opt/google/chrome/google-chrome"
-          : platform === "darwin"
-          ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-          : null;
-
-      if (!executablePath) {
-        throw new Error("Unsupported platform: " + platform);
-      }
-
-      // Check if the Chrome executable exists
-      if (!existsSync(executablePath)) {
-        throw new Error(`Chrome executable not found at ${executablePath}`);
-      }
-    } catch (pathError) {
-      console.error("Error determining Chrome path:", pathError.message);
-      // Mark all invoices as failed
-      for (const { id, reason } of invoices) {
-        failedInvoices.push({
-          id,
-          reason,
-          error: `Chrome setup error: ${pathError.message}`,
-        });
-      }
-      return { successful: successfulInvoices, failed: failedInvoices };
-    }
 
     try {
       browser = await puppeteer.launch({
-        executablePath,
         headless: false,
         defaultViewport: null,
         protocolTimeout: 1800000, // 3 minutes protocol timeout
