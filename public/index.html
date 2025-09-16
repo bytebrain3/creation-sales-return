@@ -198,31 +198,10 @@ pochondo hoy nai</textarea
         </div>
       </div>
 
-      <!-- Improved loading overlay with better structure and styling -->
-      <div id="loading-overlay" class="loading-overlay" style="display: none">
-        <div class="loading-container">
-          <div class="loading-header">
-            <div class="spinner"></div>
-            <div>Processing Invoices...</div>
-          </div>
-          <div class="logs-container" id="logs">
-            <div class="log-entry log-info">
-              <span class="timestamp">[--:--:--]</span> Waiting for logs...
-            </div>
-          </div>
-          <div class="status-bar">
-            <span
-              class="connection-indicator disconnected"
-              id="connection-indicator"
-            ></span>
-            <span
-              >Status:
-              <span id="status" class="status-disconnected"
-                >Disconnected</span
-              ></span
-            >
-          </div>
-        </div>
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" style="display: none">
+        <div class="spinner"></div>
+        <p>Processing invoices...</p>
       </div>
     </div>
 
@@ -275,54 +254,6 @@ pochondo hoy nai</textarea
             document.getElementById("success-alert").style.display = "none";
           });
       });
-    </script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const socket = io();
-      const logsContainer = document.getElementById("logs");
-      const statusElement = document.getElementById("status");
-      const connectionIndicator = document.getElementById(
-        "connection-indicator"
-      );
-
-      socket.on("connect", () => {
-        statusElement.textContent = "Connected";
-        statusElement.className = "status-connected";
-        connectionIndicator.className = "connection-indicator connected";
-        logsContainer.innerHTML = ""; // Clear logs on reconnect
-        addLogEntry("Connected to server", "info");
-      });
-
-      socket.on("disconnect", () => {
-        statusElement.textContent = "Disconnected";
-        statusElement.className = "status-disconnected";
-        connectionIndicator.className = "connection-indicator disconnected";
-        logsContainer.innerHTML = ""; // Clear logs on disconnect
-        addLogEntry("Disconnected from server", "warning");
-      });
-
-      socket.on("welcome", (data) => {
-        addLogEntry(data.message, "success");
-      });
-
-      socket.on("log", (data) => {
-        addLogEntry(data.message, data.type, data.timestamp);
-      });
-
-      function addLogEntry(message, type = "info", timestamp = null) {
-        const logEntry = document.createElement("div");
-        logEntry.className = `log-entry log-${type}`;
-
-        const time = timestamp
-          ? new Date(timestamp).toLocaleTimeString()
-          : new Date().toLocaleTimeString();
-        logEntry.innerHTML = `
-                <span class="timestamp">[${time}]</span> ${message}
-            `;
-
-        logsContainer.appendChild(logEntry);
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-      }
     </script>
     <script src="app.js"></script>
   </body>
