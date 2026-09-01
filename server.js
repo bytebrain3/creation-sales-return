@@ -225,16 +225,26 @@ async function processInvoice(page, id, reason, attempt = 1) {
     if (!hasDropdown) return { success: false, error: "Action dropdown not found - invoice may be in an invalid state" };
 
     await robustClick(page, "#sale-table tbody tr .dropdown-toggle");
-    await page.waitForFunction(() => {
-      const m = document.querySelector(".dropdown-menu");
-      return m && window.getComputedStyle(m).display !== "none";
-    }, { timeout: 4000 }).catch(() => sleep(250));
+    await page.waitForFunction(
+      () => {
+        const m = document.querySelector(".dropdown-menu");
+        return m && window.getComputedStyle(m).display !== "none";
+      },
+      { timeout: 8000 }
+    ).catch(() => sleep(500));
 
     const returnSel = '.dropdown-menu a[href*="/return-sale/invoice"]';
     const hasReturn = await page.evaluate((s) => !!document.querySelector(s), returnSel);
     if (!hasReturn) return { success: false, error: "Return option not available - invoice may already be returned or not eligible" };
 
-    await page.waitForSelector(returnSel, { visible: true, timeout: 5000 });
+    await page.waitForFunction(
+      (s) => {
+        const el = document.querySelector(s);
+        return el && el.offsetParent !== null;
+      },
+      { timeout: 10000 },
+      returnSel
+    ).catch(() => sleep(500));
     await Promise.all([
       page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: TIMEOUT.navigation }).catch(() => sleep(2000)),
       page.evaluate((s) => document.querySelector(s)?.click(), returnSel),
