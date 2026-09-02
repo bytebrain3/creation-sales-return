@@ -29,7 +29,7 @@ function buildChromeLaunchOptions(executablePath) {
 
   return {
     executablePath,
-    headless: true,
+    headless: false,
     defaultViewport: { width: 1366, height: 768 },
     protocolTimeout: 120000,
     userDataDir: profileDir,
